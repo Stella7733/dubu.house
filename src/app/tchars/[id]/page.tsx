@@ -30,8 +30,8 @@ function DisplayFields({ fields }: { fields: readonly DisplayField[] }) {
   </dl>;
 }
 
-function SheetSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="panel" style={{ maxWidth: 1000, margin: '16px auto 0', padding: 24 }}>
+function SheetSection({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return <section id={id} className="panel tcd-sheet" style={{ padding: 24, scrollMarginTop: 28 }}>
     <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14 }}>{title}</h2>
     {children}
   </section>;
@@ -61,11 +61,12 @@ function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet
     ['진정한 모습', [character.trueForm, character.trueFormEffect].filter(Boolean).join('\n')],
   ] as DisplayField[];
 
-  return <SheetSection title="마기카로기아">
-    <DisplayFields fields={stats} />
-    <div style={{ marginTop: 14 }}><DisplayFields fields={profile} /></div>
-    {(spells.length > 0 || character.grimoireSettings) && <div style={{ marginTop: 18 }}>
-      <h3 className="k-label">마도서</h3>
+  return <>
+    <SheetSection id="sheet-profile" title="마기카로기아">
+      <DisplayFields fields={stats} />
+      <div style={{ marginTop: 14 }}><DisplayFields fields={profile} /></div>
+    </SheetSection>
+    {(spells.length > 0 || character.grimoireSettings) && <SheetSection id="sheet-grimoire" title="마도서">
       {character.grimoireSettings && <p style={{ marginTop: 6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{character.grimoireSettings}</p>}
       {spells.length > 0 && <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
         {spells.map(spell => <article key={spell.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
@@ -76,8 +77,8 @@ function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet
           {spell.memo && <p className="hint" style={{ margin: '5px 0 0', whiteSpace: 'pre-wrap' }}>{spell.memo}</p>}
         </article>)}
       </div>}
-    </div>}
-  </SheetSection>;
+    </SheetSection>}
+  </>;
 }
 
 function CocSheetDetails({ character }: { character: CocInvestigatorSheet }) {
@@ -96,11 +97,11 @@ function CocSheetDetails({ character }: { character: CocInvestigatorSheet }) {
     ['출생지', character.investigator.birthplace],
     ['한마디', character.investigator.catchphrase],
   ] as DisplayField[];
-  return <SheetSection title="CoC">
+  return <SheetSection id="sheet-profile" title="CoC">
     <DisplayFields fields={basic} />
     <h3 className="k-label" style={{ margin: '18px 0 10px' }}>능력치</h3>
     <DisplayFields fields={stats} />
-    {character.backstoryHtml && <div style={{ marginTop: 18 }}>
+    {character.backstoryHtml && <div id="sheet-backstory" style={{ marginTop: 18, scrollMarginTop: 28 }}>
       <h3 className="k-label">백스토리</h3>
       <div className="post-body" style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(character.backstoryHtml) }} />
     </div>}
@@ -129,7 +130,7 @@ function InsaneSheetDetails({ character }: { character: InsaneCharacterSheet }) 
     ['정신력', [character.sanity, character.sanityMax].filter(Boolean).join(' / ')],
   ] as DisplayField[];
 
-  return <SheetSection title="inSANe">
+  return <SheetSection id="sheet-profile" title="inSANe">
     <DisplayFields fields={basic} />
     <div style={{ marginTop: 14 }}><DisplayFields fields={status} /></div>
     {selected.length > 0 && <div style={{ marginTop: 16 }}>
@@ -168,7 +169,7 @@ function Dx3rdSheetDetails({ character }: { character: Dx3rdCharacterSheet }) {
     item.category.trim().toLocaleLowerCase().startsWith('d') && (item.name || item.category))
     .map(item => [item.category, item.name].filter(Boolean).join(' · '));
 
-  return <SheetSection title="DX3rd">
+  return <SheetSection id="sheet-profile" title="DX3rd">
     <DisplayFields fields={basic} />
     <h3 className="k-label" style={{ margin: '18px 0 10px' }}>능력치</h3>
     <DisplayFields fields={abilities} />
@@ -177,6 +178,20 @@ function Dx3rdSheetDetails({ character }: { character: Dx3rdCharacterSheet }) {
       <p style={{ marginTop: 5 }}>{lois.join(' · ')}</p>
     </div>}
   </SheetSection>;
+}
+
+function activeSheetType(character: TrpgChar) {
+  if (character.sheetType) return character.sheetType;
+  const rule = character.rule.toLocaleLowerCase();
+  if (rule.includes('coc') || rule.includes('크툴루')) return 'coc';
+  if (rule.includes('insane') || rule.includes('인세인')) return 'insane';
+  if (rule.includes('마기카')) return 'magicalogia';
+  if (rule.includes('dx3')) return 'dx3rd';
+  if (character.coc) return 'coc';
+  if (character.insane) return 'insane';
+  if (character.magicalogia) return 'magicalogia';
+  if (character.dx3rd) return 'dx3rd';
+  return 'general';
 }
 
 function StandingImg({ imgId, ph }: { imgId?: string; ph: string }) {
@@ -206,90 +221,100 @@ export default function TCharDetailPage() {
   }
 
   const face = c.faces[Math.min(faceIdx, c.faces.length - 1)] ?? c.faces[0];
+  const sheetType = activeSheetType(c);
+  const magiaHasGrimoire = sheetType === 'magicalogia'
+    && Boolean(c.magicalogia?.grimoireSettings || c.magicalogia?.spells?.length);
+  const detailNav = [
+    { id: 'character-overview', label: '기본 정보' },
+    ...(sheetType === 'coc' && c.coc ? [{ id: 'sheet-profile', label: 'CoC' }] : []),
+    ...(sheetType === 'insane' && c.insane ? [{ id: 'sheet-profile', label: 'inSANe' }] : []),
+    ...(sheetType === 'magicalogia' && c.magicalogia ? [{ id: 'sheet-profile', label: '마기카로기아' }] : []),
+    ...(magiaHasGrimoire ? [{ id: 'sheet-grimoire', label: '마도서' }] : []),
+    ...(sheetType === 'dx3rd' && c.dx3rd ? [{ id: 'sheet-profile', label: 'DX3rd' }] : []),
+    ...(sheetType === 'coc' && c.coc?.backstoryHtml ? [{ id: 'sheet-backstory', label: '백스토리' }] : []),
+  ];
 
   return (
-    <section className="page">
+    <section className="page tcd-page">
       <div className="page-head">
-        <PageTitle>TRPG CHARACTERS</PageTitle>
-        <EditableDesc k="tchars-detail-desc" def="표정 썸네일을 누르면 이미지가 전환됩니다" />
-        <div className="head-actions">
+        <div className="tcd-page-title">
+          <PageTitle>TRPG CHARACTERS</PageTitle>
+          <EditableDesc k="tchars-detail-desc" def="표정 썸네일을 누르면 이미지가 전환됩니다" />
+        </div>
+        <div className="tcd-page-actions">
+          <button className="btn btn-ghost" onClick={() => router.push('/tchars')}>← 목록</button>
           {isAdmin && <button className="btn btn-dark" onClick={() => router.push(`/tchars/${c.id}/edit`)}>EDIT</button>}
           {isAdmin && <button className="btn btn-dark" onClick={() => setDelAsk(true)}>DELETE</button>}
         </div>
       </div>
 
       <div className="tcd-layout">
-        {/* 좌 — 현재 표정 원본 (스탠딩이면 전신), 클릭 시 확대 */}
-        <div className="panel" style={{ padding: 14 }}>
-          {c.imgMode === 'standing' ? (
-            /* 스탠딩 인장 — 전신 원본 비율 그대로 (클릭 확대) */
-            <div className="tcd-img" style={{
-              aspectRatio: 'auto', minHeight: 260, display: 'grid', placeItems: 'center',
-              cursor: face?.imgId ? 'zoom-in' : undefined,
-            }}
-              onClick={() => { if (face?.imgId) setLbOpen(true); }}>
-              <StandingImg imgId={face?.imgId} ph={face?.ph ?? c.ph} />
+        <nav className="tcd-nav" aria-label="캐릭터 정보 목차">
+          {detailNav.map((item, index) => <a key={`${item.id}-${item.label}`} href={`#${item.id}`}>
+            <span>{String(index + 1).padStart(2, '0')}</span>{item.label}
+          </a>)}
+        </nav>
+
+        <div className="tcd-content">
+          <section id="character-overview" className="panel tcd-overview">
+            <div className="tcd-kicker">PROFILE <span>??</span></div>
+            <h2>{c.name}</h2>
+            {c.role && <span className="pill dark">{c.role}</span>}
+            <div className="tcd-meta">
+              {c.rule && <span><b>Rule</b>{c.rule}</span>}
+              {c.scenario && <span><b>Scenario</b>{c.scenario}</span>}
             </div>
-          ) : (
-            /* 단일 인장 — 1:1 규격 */
-            <div className="tcd-img" style={{ cursor: face?.imgId ? 'zoom-in' : undefined }}
-              onClick={() => { if (face?.imgId) setLbOpen(true); }}>
-              <CroppedBlobImg fileRef={face?.imgId} crop={faceCrop(c, face)} ph={face?.ph ?? c.ph} />
-            </div>
-          )}
-          {/* 표정 전환 — 1:1 썸네일 (스탠딩은 공유 크롭 위치) */}
-          {c.faces.length > 1 && (
-            <div className="tc-faces" style={{ marginTop: 10 }}>
-              {c.faces.map((f, i) => (
-                <div key={f.id} className={`fc ${i === faceIdx ? 'on' : ''}`}
-                  data-tip={f.label || undefined}
-                  onClick={() => setFaceIdx(i)}>
-                  <CroppedBlobImg fileRef={f.imgId} crop={faceCrop(c, f)} ph={f.ph ?? c.ph} />
-                </div>
-              ))}
-            </div>
-          )}
+            {c.desc
+              ? <div className="post-body tcd-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(c.desc) }} />
+              : <p className="hint tcd-description">설명이 없습니다</p>}
+            {c.scenarioLogs && c.scenarioLogs.length > 0 && <div className="tcd-scenarios">
+              <h3 className="k-label">시나리오 기록</h3>
+              {c.scenarioLogs.map(log => <p key={log.id}>
+                {[log.title, log.date, log.role, log.note].filter(Boolean).join(' · ')}
+              </p>)}
+            </div>}
+          </section>
+
+          {sheetType === 'coc' && c.coc && <CocSheetDetails character={c.coc} />}
+          {sheetType === 'insane' && c.insane && <InsaneSheetDetails character={c.insane} />}
+          {sheetType === 'magicalogia' && c.magicalogia && <MagiaSheetDetails character={c.magicalogia} />}
+          {sheetType === 'dx3rd' && c.dx3rd && <Dx3rdSheetDetails character={c.dx3rd} />}
         </div>
 
-        {/* 우 — 정보 + 설명 */}
-        <div className="panel" style={{ padding: 24 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-            {c.name}
-            {c.role && <span className="pill dark">{c.role}</span>}
-            {face?.label && c.faces.length > 1 && (
-              <span className="pill" style={{ marginLeft: 'auto' }}>{face.label}</span>
-            )}
-          </h2>
-          <div style={{ display: 'grid', gap: 7, padding: '12px 0', borderBottom: '1px dashed var(--line)', fontSize: 12.5 }}>
-            {c.scenario && (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <b style={{ minWidth: 70, color: 'var(--faint)', fontWeight: 600 }}>Scenario</b>{c.scenario}
-              </div>
-            )}
-            {c.rule && (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <b style={{ minWidth: 70, color: 'var(--faint)', fontWeight: 600 }}>Rule</b>{c.rule}
-              </div>
-            )}
-            {c.role && (
-              <div style={{ display: 'flex', gap: 10 }}>
-                <b style={{ minWidth: 70, color: 'var(--faint)', fontWeight: 600 }}>Role</b>{c.role}
-              </div>
-            )}
+        <div className="tcd-visual">
+          <div className={`tcd-art ${c.imgMode === 'standing' ? 'standing' : 'stamp'}`}
+            role={face?.imgId ? 'button' : undefined}
+            tabIndex={face?.imgId ? 0 : undefined}
+            aria-label={face?.imgId ? '캐릭터 이미지 확대' : undefined}
+            onClick={() => { if (face?.imgId) setLbOpen(true); }}
+            onKeyDown={event => {
+              if (face?.imgId && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                setLbOpen(true);
+              }
+            }}>
+            <div className="tcd-art-image">
+              {c.imgMode === 'standing'
+                ? <StandingImg imgId={face?.imgId} ph={face?.ph ?? c.ph} />
+                : <CroppedBlobImg fileRef={face?.imgId} crop={faceCrop(c, face)} ph={face?.ph ?? c.ph} />}
+            </div>
+            <div className="tcd-art-caption">
+              <span>{c.name}</span>
+              {face?.label && <small>{face.label}</small>}
+              {c.rule && <small>{c.rule}</small>}
+            </div>
           </div>
-          {c.desc ? (
-            <div className="post-body" style={{ fontSize: 13, paddingTop: 14 }}
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(c.desc) }} />
-          ) : (
-            <p className="hint" style={{ paddingTop: 14 }}>설명이 없습니다</p>
-          )}
+          {c.faces.length > 1 && <div className="tc-faces tcd-faces">
+            {c.faces.map((item, index) => <button key={item.id}
+              className={`fc ${index === faceIdx ? 'on' : ''}`}
+              aria-label={item.label || `표정 ${index + 1}`}
+              aria-pressed={index === faceIdx}
+              onClick={() => setFaceIdx(index)}>
+              <CroppedBlobImg fileRef={item.imgId} crop={faceCrop(c, item)} ph={item.ph ?? c.ph} />
+            </button>)}
+          </div>}
         </div>
       </div>
-
-      {c.coc && <CocSheetDetails character={c.coc} />}
-      {c.insane && <InsaneSheetDetails character={c.insane} />}
-      {c.magicalogia && <MagiaSheetDetails character={c.magicalogia} />}
-      {c.dx3rd && <Dx3rdSheetDetails character={c.dx3rd} />}
 
       {lbOpen && face?.imgId && (
         <Lightbox srcs={c.faces.filter(f => f.imgId).map(f => f.imgId!)}
