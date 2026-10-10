@@ -372,7 +372,6 @@ const emptyMagicaLogiaSheet = (sheet?: MagicaLogiaCharacterSheet): MagicaLogiaCh
   magicName: '', rank: '', gender: '', age: '', socialStatus: '',
   attack: '', defense: '', root: '', trueForm: '', trueFormEffect: '', mana: '', achievement: '',
   magia: '', temporaryMana: '', credo: '', career: '', institution: '', introduction: '',
-  soulSpecialty: '',
   grimoireSettings: '', domainSettings: '', statusAilments: '',
   ...sheet,
   soulSpecialty: sheet?.soulSpecialty ?? (() => {
@@ -395,12 +394,15 @@ function parseCocofoliaMagiaCharacter(raw: string): {
   sheet: Partial<MagicaLogiaCharacterSheet>;
 } {
   const parsed: unknown = JSON.parse(raw);
-  if (!isRecord(parsed) || parsed.kind !== 'character' || !isRecord(parsed.data)
-    || typeof parsed.data.name !== 'string' || !parsed.data.name.trim()) {
+  if (!isRecord(parsed) || parsed.kind !== 'character' || !isRecord(parsed.data)) {
     throw new Error('코코포리아 캐릭터 JSON 형식이 아닙니다.');
   }
 
   const data = parsed.data;
+  const name = data.name;
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('코코포리아 캐릭터 JSON 형식이 아닙니다.');
+  }
   const statusFields: Record<string, keyof Pick<
     MagicaLogiaCharacterSheet, 'mana' | 'attack' | 'defense' | 'root' | 'temporaryMana' | 'achievement' | 'magia'
   >> = {
@@ -446,7 +448,7 @@ function parseCocofoliaMagiaCharacter(raw: string): {
     if (spells.length) importedSheet.spells = spells;
   }
 
-  return { name: data.name.trim(), sheet: importedSheet };
+  return { name: name.trim(), sheet: importedSheet };
 }
 
 const DX3RD_ABILITY_GROUPS: { id: Dx3rdAbilityKey; label: string; skills: string[] }[] = [

@@ -19,7 +19,7 @@ import { useBlobUrl } from '@/lib/blobStore';
 
 type DisplayField = readonly [label: string, value: string | number | boolean | undefined | null];
 
-function DisplayFields({ fields }: { fields: DisplayField[] }) {
+function DisplayFields({ fields }: { fields: readonly DisplayField[] }) {
   const visibleFields = fields.filter(([, value]) => value !== undefined && value !== null && value !== '');
   if (visibleFields.length === 0) return null;
   return <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
