@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalList, newId } from '@/lib/postStore';
-import { TrpgChar, TrpgFace, TCHAR_SEED } from '@/lib/tcharStore';
+import { CocInvestigatorSheet, CocInventoryItem, CocSkill, CocWeapon, TrpgChar, TrpgFace, COC7_SKILL_DEFAULTS, TCHAR_SEED } from '@/lib/tcharStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
 import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
 import { KInput } from '@/components/ui/Kit';
@@ -66,6 +66,170 @@ function FaceCropModal({ f, initial, onClose, onApply }: {
   return <CropEditor open src={src} aspect="1:1" initial={initial} onClose={onClose} onApply={onApply} />;
 }
 
+const emptyCocSheet = (sheet?: CocInvestigatorSheet): CocInvestigatorSheet => ({
+  investigator: {
+    player: '', occupation: '', age: '', gender: '', residence: '', birthplace: '', catchphrase: '',
+    ...sheet?.investigator,
+  },
+  characteristics: {
+    str: '', con: '', siz: '', dex: '', app: '', int: '', pow: '', edu: '',
+    ...sheet?.characteristics,
+  },
+  derived: {
+    hp: '', hpMax: '', mp: '', mpMax: '', sanity: '', sanityMax: '', luck: '',
+    damageBonus: '', build: '', moveRate: '', ...sheet?.derived,
+  },
+  mental: {
+    sanityAdaptation: '', temporaryInsanity: false, longTermInsanity: false,
+    bout: '', currentState: '', ...sheet?.mental,
+  },
+  skills: sheet?.skills ?? COC7_SKILL_DEFAULTS.map(([name, base]) => ({
+    id: newId(), name, base, current: base, growthChecked: false,
+  })),
+  backstoryHtml: sheet?.backstoryHtml ?? '',
+  weapons: sheet?.weapons ?? [],
+  equipment: sheet?.equipment ?? [],
+  possessions: sheet?.possessions ?? [],
+  finance: { spendingLevel: '', cash: '', assets: '', ...sheet?.finance },
+  scenarioLogs: sheet?.scenarioLogs ?? [],
+});
+
+function CocField({ label, value, onChange }: {
+  label: string; value: string; onChange: (value: string) => void;
+}) {
+  return <label style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+    <span className="k-label" style={{ margin: 0 }}>{label}</span>
+    <KInput value={value} onChange={e => onChange(e.target.value)} />
+  </label>;
+}
+
+function CocSheetEditor({ data, onChange }: {
+  data: CocInvestigatorSheet; onChange: (next: CocInvestigatorSheet) => void;
+}) {
+  const grid: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 9 };
+  const patch = <K extends 'investigator' | 'characteristics' | 'derived' | 'mental' | 'finance',>(
+    key: K, values: Partial<CocInvestigatorSheet[K]>,
+  ) => {
+    onChange({ ...data, [key]: { ...data[key], ...values } } as CocInvestigatorSheet);
+  };
+  const patchSkill = (id: string, values: Partial<CocSkill>) =>
+    onChange({ ...data, skills: data.skills.map(skill => skill.id === id ? { ...skill, ...values } : skill) });
+  const patchWeapon = (id: string, values: Partial<CocWeapon>) =>
+    onChange({ ...data, weapons: data.weapons.map(weapon => weapon.id === id ? { ...weapon, ...values } : weapon) });
+  const patchItems = (key: 'equipment' | 'possessions', id: string, values: Partial<CocInventoryItem>) =>
+    onChange({ ...data, [key]: data[key].map(item => item.id === id ? { ...item, ...values } : item) });
+
+  return <div style={{ display: 'grid', gap: 10 }}>
+    <details className="panel" open style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>탐사자 정보</summary>
+      <div style={grid}>
+        <CocField label="플레이어" value={data.investigator.player} onChange={v => patch('investigator', { player: v })} />
+        <CocField label="직업" value={data.investigator.occupation} onChange={v => patch('investigator', { occupation: v })} />
+        <CocField label="나이" value={data.investigator.age} onChange={v => patch('investigator', { age: v })} />
+        <CocField label="성별" value={data.investigator.gender} onChange={v => patch('investigator', { gender: v })} />
+        <CocField label="거주지" value={data.investigator.residence} onChange={v => patch('investigator', { residence: v })} />
+        <CocField label="출생지" value={data.investigator.birthplace} onChange={v => patch('investigator', { birthplace: v })} />
+        <CocField label="한마디 / 비고" value={data.investigator.catchphrase} onChange={v => patch('investigator', { catchphrase: v })} />
+      </div>
+    </details>
+
+    <details className="panel" open style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>특성치와 파생 수치</summary>
+      <div style={grid}>
+        {([['str', '근력'], ['con', '건강'], ['siz', '크기'], ['dex', '민첩'], ['app', '외모'], ['int', '지능'], ['pow', '정신력'], ['edu', '교육']] as const).map(([key, label]) =>
+          <CocField key={key} label={label} value={data.characteristics[key]} onChange={v => patch('characteristics', { [key]: v })} />)}
+      </div>
+      <div style={{ ...grid, marginTop: 12 }}>
+        <CocField label="체력 현재" value={data.derived.hp} onChange={v => patch('derived', { hp: v })} />
+        <CocField label="체력 최대" value={data.derived.hpMax} onChange={v => patch('derived', { hpMax: v })} />
+        <CocField label="마력 현재" value={data.derived.mp} onChange={v => patch('derived', { mp: v })} />
+        <CocField label="마력 최대" value={data.derived.mpMax} onChange={v => patch('derived', { mpMax: v })} />
+        <CocField label="이성 현재" value={data.derived.sanity} onChange={v => patch('derived', { sanity: v })} />
+        <CocField label="이성 최대" value={data.derived.sanityMax} onChange={v => patch('derived', { sanityMax: v })} />
+        <CocField label="행운" value={data.derived.luck} onChange={v => patch('derived', { luck: v })} />
+        <CocField label="피해 보너스" value={data.derived.damageBonus} onChange={v => patch('derived', { damageBonus: v })} />
+        <CocField label="체구" value={data.derived.build} onChange={v => patch('derived', { build: v })} />
+        <CocField label="이동력" value={data.derived.moveRate} onChange={v => patch('derived', { moveRate: v })} />
+      </div>
+      <div style={{ ...grid, marginTop: 12 }}>
+        <CocField label="이성 손실 상태 (적응)" value={data.mental.sanityAdaptation} onChange={v => patch('mental', { sanityAdaptation: v })} />
+        <CocField label="광기의 발작" value={data.mental.bout} onChange={v => patch('mental', { bout: v })} />
+        <CocField label="현재 정신 상태" value={data.mental.currentState} onChange={v => patch('mental', { currentState: v })} />
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+        <label><input type="checkbox" checked={data.mental.temporaryInsanity} onChange={e => patch('mental', { temporaryInsanity: e.target.checked })} /> 일시적 광기</label>
+        <label><input type="checkbox" checked={data.mental.longTermInsanity} onChange={e => patch('mental', { longTermInsanity: e.target.checked })} /> 장기적 광기</label>
+      </div>
+    </details>
+
+    <details className="panel" style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>기능 목록 ({data.skills.length})</summary>
+      <div style={{ display: 'grid', gap: 5 }}>
+        {data.skills.map(skill => <div key={skill.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(115px, 1fr) 72px 72px auto auto', gap: 6, alignItems: 'center' }}>
+          <KInput value={skill.name} aria-label="기능 이름" onChange={e => patchSkill(skill.id, { name: e.target.value })} />
+          <KInput value={skill.base} aria-label="기본값" placeholder="기본" onChange={e => patchSkill(skill.id, { base: e.target.value })} />
+          <KInput value={skill.current} aria-label="현재값" placeholder="현재" onChange={e => patchSkill(skill.id, { current: e.target.value })} />
+          <label style={{ whiteSpace: 'nowrap', fontSize: 11 }}><input type="checkbox" checked={skill.growthChecked} onChange={e => patchSkill(skill.id, { growthChecked: e.target.checked })} /> 성장</label>
+          <button className="btn btn-ghost" aria-label={`${skill.name} 삭제`} onClick={() => onChange({ ...data, skills: data.skills.filter(item => item.id !== skill.id) })}>✕</button>
+        </div>)}
+      </div>
+      <button className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => onChange({ ...data, skills: [...data.skills, { id: newId(), name: '', base: '', current: '', growthChecked: false }] })}>＋ 기능 추가</button>
+    </details>
+
+    <details className="panel" style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>백스토리</summary>
+      <RichEditor value={data.backstoryHtml} onChange={backstoryHtml => onChange({ ...data, backstoryHtml })} placeholder="겉보기, 성격, 관계, 사상/신념, 공포증과 집착증, 이상한 경험 등을 작성하세요" />
+    </details>
+
+    <details className="panel" style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>전투, 장비와 소지품</summary>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {data.weapons.map(weapon => <div key={weapon.id} style={{ ...grid, borderBottom: '1px solid var(--line)', paddingBottom: 8 }}>
+          <CocField label="무기" value={weapon.name} onChange={v => patchWeapon(weapon.id, { name: v })} />
+          <CocField label="기능" value={weapon.skill} onChange={v => patchWeapon(weapon.id, { skill: v })} />
+          <CocField label="피해" value={weapon.damage} onChange={v => patchWeapon(weapon.id, { damage: v })} />
+          <CocField label="사거리" value={weapon.range} onChange={v => patchWeapon(weapon.id, { range: v })} />
+          <CocField label="공격 횟수" value={weapon.attacks} onChange={v => patchWeapon(weapon.id, { attacks: v })} />
+          <CocField label="탄약" value={weapon.ammo} onChange={v => patchWeapon(weapon.id, { ammo: v })} />
+          <CocField label="고장" value={weapon.malfunction} onChange={v => patchWeapon(weapon.id, { malfunction: v })} />
+          <CocField label="이미지 URL" value={weapon.image} onChange={v => patchWeapon(weapon.id, { image: v })} />
+          <button className="btn btn-ghost" onClick={() => onChange({ ...data, weapons: data.weapons.filter(item => item.id !== weapon.id) })}>무기 삭제</button>
+        </div>)}
+      </div>
+      <button className="btn btn-ghost" style={{ marginTop: 8 }} onClick={() => onChange({ ...data, weapons: [...data.weapons, { id: newId(), name: '', skill: '', damage: '', range: '', attacks: '', ammo: '', malfunction: '', image: '' }] })}>＋ 무기 추가</button>
+      {(['equipment', 'possessions'] as const).map(key => <div key={key} style={{ marginTop: 12 }}>
+        <label className="k-label">{key === 'equipment' ? '장비' : '소지품'}</label>
+        {data[key].map(item => <div key={item.id} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <KInput placeholder="이름" value={item.name} onChange={e => patchItems(key, item.id, { name: e.target.value })} />
+          <KInput placeholder="설명" value={item.description} onChange={e => patchItems(key, item.id, { description: e.target.value })} />
+          <button className="btn btn-ghost" onClick={() => onChange({ ...data, [key]: data[key].filter(row => row.id !== item.id) })}>✕</button>
+        </div>)}
+        <button className="btn btn-ghost" onClick={() => onChange({ ...data, [key]: [...data[key], { id: newId(), name: '', description: '' }] })}>＋ 추가</button>
+      </div>)}
+    </details>
+
+    <details className="panel" style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>현금과 자산</summary>
+      <div style={grid}>
+        <CocField label="소비 수준" value={data.finance.spendingLevel} onChange={v => patch('finance', { spendingLevel: v })} />
+        <CocField label="현금" value={data.finance.cash} onChange={v => patch('finance', { cash: v })} />
+        <CocField label="자산" value={data.finance.assets} onChange={v => patch('finance', { assets: v })} />
+      </div>
+    </details>
+
+    <details className="panel" style={{ padding: 16 }}>
+      <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>다녀온 시나리오 ({data.scenarioLogs.length})</summary>
+      {data.scenarioLogs.map(log => <div key={log.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 2fr auto', gap: 6, marginBottom: 6 }}>
+        <KInput placeholder="시나리오 제목" value={log.title} onChange={e => onChange({ ...data, scenarioLogs: data.scenarioLogs.map(item => item.id === log.id ? { ...item, title: e.target.value } : item) })} />
+        <KInput type="date" value={log.date} onChange={e => onChange({ ...data, scenarioLogs: data.scenarioLogs.map(item => item.id === log.id ? { ...item, date: e.target.value } : item) })} />
+        <KInput placeholder="한마디 또는 비고" value={log.note} onChange={e => onChange({ ...data, scenarioLogs: data.scenarioLogs.map(item => item.id === log.id ? { ...item, note: e.target.value } : item) })} />
+        <button className="btn btn-ghost" onClick={() => onChange({ ...data, scenarioLogs: data.scenarioLogs.filter(item => item.id !== log.id) })}>✕</button>
+      </div>)}
+      <button className="btn btn-ghost" onClick={() => onChange({ ...data, scenarioLogs: [...data.scenarioLogs, { id: newId(), title: '', date: '', note: '' }] })}>＋ 시나리오 기록</button>
+    </details>
+  </div>;
+}
+
 export function TCharForm({ editId }: { editId?: string }) {
   const router = useRouter();
   const toast = useToast();
@@ -76,6 +240,8 @@ export function TCharForm({ editId }: { editId?: string }) {
   const [name, setName] = useState(orig?.name ?? '');
   const [scenario, setScenario] = useState(orig?.scenario ?? '');
   const [rule, setRule] = useState(orig?.rule ?? '');
+  const [sheetType, setSheetType] = useState<'general' | 'coc'>(orig?.sheetType ?? 'general');
+  const [coc, setCoc] = useState<CocInvestigatorSheet>(() => emptyCocSheet(orig?.coc));
   const [role, setRole] = useState(orig?.role ?? '');
   const [desc, setDesc] = useState(orig?.desc ?? '');
   const [imgMode, setImgMode] = useState<'stamp' | 'standing'>(orig?.imgMode ?? 'stamp');
@@ -97,7 +263,8 @@ export function TCharForm({ editId }: { editId?: string }) {
     const o = tchars.find(c => c.id === editId);
     if (!o) return;
     hydrated.current = true;
-    setName(o.name); setScenario(o.scenario ?? ''); setRule(o.rule ?? ''); setRole(o.role ?? '');
+    setName(o.name); setScenario(o.scenario ?? ''); setRule(o.rule ?? '');
+    setSheetType(o.sheetType ?? 'general'); setCoc(emptyCocSheet(o.coc)); setRole(o.role ?? '');
     setDesc(o.desc ?? '');
     setImgMode(o.imgMode ?? 'stamp');
     setSharedCrop(o.crop);
@@ -161,6 +328,7 @@ export function TCharForm({ editId }: { editId?: string }) {
     if (outFaces.length === 0) outFaces.push({ id: newId(), label: '기본', ph: 'cool' });
     const patch = {
       name: name.trim(), scenario: scenario.trim(), rule: rule.trim(), role: role.trim(),
+      sheetType, coc: sheetType === 'coc' || orig?.coc ? coc : undefined,
       desc, faces: outFaces, imgMode,
       crop: imgMode === 'standing' ? sharedCrop : undefined,
       stdW: imgMode === 'standing' ? stdDims?.w : undefined,
@@ -201,6 +369,15 @@ export function TCharForm({ editId }: { editId?: string }) {
           <KInput value={rule} onChange={e => setRule(e.target.value)} />
         </div>
       </div>
+
+      <div>
+        <label className="k-label" style={{ marginBottom: 7 }}>캐릭터 시트</label>
+        <div className="mini-seg">
+          <button className={sheetType === 'general' ? 'on' : ''} onClick={() => setSheetType('general')}>일반</button>
+          <button className={sheetType === 'coc' ? 'on' : ''} onClick={() => setSheetType('coc')}>CoC</button>
+        </div>
+      </div>
+      {sheetType === 'coc' && <CocSheetEditor data={coc} onChange={setCoc} />}
 
       {/* 이미지 방식 + 표정 목록 */}
       <div>
