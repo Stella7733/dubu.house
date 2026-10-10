@@ -88,7 +88,7 @@ export interface CocInvestigatorSheet {
   equipment: CocInventoryItem[];
   possessions: CocInventoryItem[];
   finance: { spendingLevel: string; cash: string; assets: string };
-  scenarioLogs?: CocScenarioLog[];
+  scenarioLogs: CocScenarioLog[];
 }
 
 export const COC7_SKILL_DEFAULTS = [
@@ -243,7 +243,7 @@ export interface MagicaLogiaCharacterSheet {
   obligations: MagiaObligation[];
   statusAilments: string;
   spells: MagiaSpell[];
-  sessionLogs?: MagiaSessionLog[];
+  sessionLogs: MagiaSessionLog[];
 }
 
 export type Dx3rdAbilityKey = 'body' | 'sense' | 'mind' | 'social';
