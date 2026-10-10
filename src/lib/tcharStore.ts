@@ -167,7 +167,6 @@ export const MAGICALOGIA_SPECIALTY_GROUPS = [
 export interface MagiaSpecialty {
   id: string;
   selected: boolean;
-  targetOverride?: string;
 }
 
 export interface MagiaAnchor {
@@ -213,11 +212,9 @@ export interface MagiaSessionLog {
 
 export interface MagicaLogiaCharacterSheet {
   magicName: string;
-  practitioner: string;
   rank: string;
   gender: string;
   age: string;
-  codeName: string;
   socialStatus: string;
   attack: string;
   defense: string;
@@ -232,11 +229,9 @@ export interface MagicaLogiaCharacterSheet {
   career: string;
   institution: string;
   introduction: string;
-  condition: string;
-  specialtyNotes: string;
   specialties: MagiaSpecialty[];
-  soulSpecialtyId: string;
-  soulTargetOverride?: string;
+  soulSpecialty: string;
+  soulSpecialtyId?: string;
   anchors: MagiaAnchor[];
   grimoireSettings: string;
   domainSettings: string;

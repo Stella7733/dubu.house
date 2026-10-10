@@ -5,10 +5,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalList, newId } from '@/lib/postStore';
-import { CocInvestigatorSheet, CocInventoryItem, CocSkill, CocWeapon, Dx3rdAbilityKey, Dx3rdArmor, Dx3rdCharacterSheet, Dx3rdCombo, Dx3rdEffect, Dx3rdEffectCategory, Dx3rdItem, Dx3rdLois, Dx3rdMemory, Dx3rdSeedData, Dx3rdSkill, Dx3rdVehicle, Dx3rdWeapon, InsaneAbility, InsaneCharacterSheet, InsaneRelationship, InsaneSpecialty, MagiaAnchor, MagiaObligation, MagiaSpell, MagicaLogiaCharacterSheet, TrpgChar, TrpgFace, TrpgScenarioLog, COC7_SKILL_DEFAULTS, INSANE_SPECIALTY_GROUPS, MAGICALOGIA_SPECIALTY_GROUPS, TCHAR_SEED } from '@/lib/tcharStore';
+import { CocInvestigatorSheet, CocInventoryItem, CocSkill, CocWeapon, Dx3rdAbilityKey, Dx3rdArmor, Dx3rdCharacterSheet, Dx3rdCombo, Dx3rdEffect, Dx3rdEffectCategory, Dx3rdItem, Dx3rdLois, Dx3rdMemory, Dx3rdSeedData, Dx3rdSkill, Dx3rdVehicle, Dx3rdWeapon, InsaneAbility, InsaneCharacterSheet, InsaneRelationship, InsaneSpecialty, MagiaAnchor, MagiaObligation, MagiaSpecialty, MagiaSpell, MagicaLogiaCharacterSheet, TrpgChar, TrpgFace, TrpgScenarioLog, COC7_SKILL_DEFAULTS, INSANE_SPECIALTY_GROUPS, MAGICALOGIA_SPECIALTY_GROUPS, TCHAR_SEED } from '@/lib/tcharStore';
 import { putBlob, getBlob, useBlobUrl } from '@/lib/blobStore';
 import { CropEditor, CropImg, CropValue } from '@/components/ui/CropEditor';
-import { KInput } from '@/components/ui/Kit';
+import { KInput, KTextarea } from '@/components/ui/Kit';
 import { RichEditor } from '@/components/ui/RichEditor';
 import { DragList } from '@/components/ui/DragList';
 import { Modal, useConfirmDelete } from '@/components/ui/Modal';
@@ -356,30 +356,97 @@ function InsaneSheetEditor({ data, onChange }: {
   </div>;
 }
 
-const allMagiaSpecialties = MAGICALOGIA_SPECIALTY_GROUPS.flatMap(group =>
-  group.skills.map((name, index) => ({ id: `${group.id}-${index}`, groupId: group.id, name, index })));
+const magiaDomains = MAGICALOGIA_SPECIALTY_GROUPS.map(({ id, name }) => ({ id, name }));
+
+function normalizeMagiaSpecialties(specialties?: MagiaSpecialty[]): MagiaSpecialty[] {
+  return magiaDomains.map(domain => ({
+    id: domain.id,
+    selected: specialties?.some(specialty =>
+      specialty.id === domain.id
+        ? specialty.selected
+        : specialty.id.startsWith(`${domain.id}-`) && specialty.selected) ?? false,
+  }));
+}
 
 const emptyMagicaLogiaSheet = (sheet?: MagicaLogiaCharacterSheet): MagicaLogiaCharacterSheet => ({
-  magicName: '', practitioner: '', rank: '', gender: '', age: '', codeName: '', socialStatus: '',
+  magicName: '', rank: '', gender: '', age: '', socialStatus: '',
   attack: '', defense: '', root: '', trueForm: '', trueFormEffect: '', mana: '', achievement: '',
   magia: '', temporaryMana: '', credo: '', career: '', institution: '', introduction: '',
-  condition: '', specialtyNotes: '', soulSpecialtyId: '',
+  soulSpecialty: '',
   grimoireSettings: '', domainSettings: '', statusAilments: '',
   ...sheet,
-  specialties: sheet?.specialties ?? allMagiaSpecialties.map(skill => ({ id: skill.id, selected: false })),
+  soulSpecialty: sheet?.soulSpecialty ?? (() => {
+    const [groupId, index] = (sheet?.soulSpecialtyId ?? '').split('-');
+    return MAGICALOGIA_SPECIALTY_GROUPS.find(group => group.id === groupId)?.skills[Number(index)] ?? '';
+  })(),
+  specialties: normalizeMagiaSpecialties(sheet?.specialties),
   anchors: sheet?.anchors ?? [],
   obligations: sheet?.obligations ?? [],
   spells: sheet?.spells ?? [],
   sessionLogs: sheet?.sessionLogs ?? [],
 });
 
-function magiaTarget(sheet: MagicaLogiaCharacterSheet, specialtyId: string) {
-  const origin = allMagiaSpecialties.find(skill => skill.id === sheet.soulSpecialtyId);
-  const target = allMagiaSpecialties.find(skill => skill.id === specialtyId);
-  if (!origin || !target) return '';
-  const groupDistance = Math.abs(MAGICALOGIA_SPECIALTY_GROUPS.findIndex(group => group.id === origin.groupId)
-    - MAGICALOGIA_SPECIALTY_GROUPS.findIndex(group => group.id === target.groupId));
-  return String(6 + groupDistance + Math.abs(origin.index - target.index));
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseCocofoliaMagiaCharacter(raw: string): {
+  name: string;
+  sheet: Partial<MagicaLogiaCharacterSheet>;
+} {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed) || parsed.kind !== 'character' || !isRecord(parsed.data)
+    || typeof parsed.data.name !== 'string' || !parsed.data.name.trim()) {
+    throw new Error('코코포리아 캐릭터 JSON 형식이 아닙니다.');
+  }
+
+  const data = parsed.data;
+  const statusFields: Record<string, keyof Pick<
+    MagicaLogiaCharacterSheet, 'mana' | 'attack' | 'defense' | 'root' | 'temporaryMana' | 'achievement' | 'magia'
+  >> = {
+    '마력': 'mana',
+    '공격력': 'attack',
+    '방어력': 'defense',
+    '근원력': 'root',
+    '일시적 마력': 'temporaryMana',
+    '공적점': 'achievement',
+    '마화': 'magia',
+  };
+  const importedSheet: Partial<MagicaLogiaCharacterSheet> = {};
+  if (Array.isArray(data.status)) {
+    for (const item of data.status) {
+      if (!isRecord(item) || typeof item.label !== 'string'
+        || (typeof item.value !== 'string' && typeof item.value !== 'number')) continue;
+      const field = statusFields[item.label];
+      if (field) importedSheet[field] = String(item.value);
+    }
+  }
+
+  if (typeof data.commands === 'string') {
+    const spells: MagiaSpell[] = [];
+    for (const line of data.commands.split(/\r?\n/)) {
+      const spell = line.match(/^\[\[장서\]\]\s*(?:《([^》]+)》)?\s*【([^】]+)】\s*\|\s*([^|]*)\|\s*([^|]*)\|\s*(.*)$/);
+      if (spell) {
+        const [effect, ...memo] = spell[5].split(/\s*▶\s*/);
+        spells.push({
+          id: newId(),
+          name: spell[2].trim(),
+          type: spell[1]?.trim() ?? '',
+          target: spell[3].trim(),
+          cost: spell[4].trim(),
+          effect: effect.trim(),
+          specialtyId: '',
+          charges: Array(7).fill(false),
+          tool: '',
+          overview: '',
+          memo: memo.join(' ▶ ').trim(),
+        });
+      }
+    }
+    if (spells.length) importedSheet.spells = spells;
+  }
+
+  return { name: data.name.trim(), sheet: importedSheet };
 }
 
 const DX3RD_ABILITY_GROUPS: { id: Dx3rdAbilityKey; label: string; skills: string[] }[] = [
@@ -695,11 +762,9 @@ function MagicaLogiaSheetEditor({ data, onChange }: {
       <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>마법사 정보</summary>
       <div style={fieldGrid}>
         <CocField label="마법명" value={data.magicName} onChange={value => patch('magicName', value)} />
-        <CocField label="실천자" value={data.practitioner} onChange={value => patch('practitioner', value)} />
         <CocField label="계제" value={data.rank} onChange={value => patch('rank', value)} />
         <CocField label="성별" value={data.gender} onChange={value => patch('gender', value)} />
         <CocField label="연령" value={data.age} onChange={value => patch('age', value)} />
-        <CocField label="문호" value={data.codeName} onChange={value => patch('codeName', value)} />
         <CocField label="사회적 신분" value={data.socialStatus} onChange={value => patch('socialStatus', value)} />
         <CocField label="공격력" value={data.attack} onChange={value => patch('attack', value)} />
         <CocField label="방어력" value={data.defense} onChange={value => patch('defense', value)} />
@@ -718,45 +783,27 @@ function MagicaLogiaSheetEditor({ data, onChange }: {
       </div>
       <label style={{ display: 'grid', gap: 4, marginTop: 12 }}>
         <span className="k-label" style={{ margin: 0 }}>소개</span>
-        <textarea value={data.introduction} onChange={e => patch('introduction', e.target.value)} style={{ minHeight: 90, padding: 9, resize: 'vertical' }} />
+        <KTextarea value={data.introduction} onChange={e => patch('introduction', e.target.value)} />
       </label>
-      <div style={{ ...fieldGrid, marginTop: 12 }}>
-        <CocField label="조건" value={data.condition} onChange={value => patch('condition', value)} />
-        <CocField label="특기 사항" value={data.specialtyNotes} onChange={value => patch('specialtyNotes', value)} />
-      </div>
     </details>
 
     <details className="panel" open style={{ padding: 16 }}>
       <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>영역 특기 · 혼의 특기</summary>
-      <label style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 120px', gap: 8, maxWidth: 430, alignItems: 'end', marginBottom: 12 }}>
-        <span style={{ display: 'grid', gap: 4 }}>
-          <span className="k-label" style={{ margin: 0 }}>혼의 특기</span>
-          <select style={selectStyle} value={data.soulSpecialtyId} onChange={e => patch('soulSpecialtyId', e.target.value)}>
-            <option value="">선택</option>
-            {MAGICALOGIA_SPECIALTY_GROUPS.map(group => <optgroup key={group.id} label={group.name}>
-              {group.skills.map((name, index) => <option key={`${group.id}-${index}`} value={`${group.id}-${index}`}>{name}</option>)}
-            </optgroup>)}
-          </select>
-        </span>
-        <CocField label="혼의 특기 목표치" value={data.soulTargetOverride ?? '6'} onChange={value => patch('soulTargetOverride', value || undefined)} />
-      </label>
-      <p className="hint" style={{ margin: '0 0 10px' }}>각 특기 목표치는 혼의 특기와 표상 거리로 계산하며, 특기별 입력란에서 덮어쓸 수 있습니다.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 10 }}>
-        {MAGICALOGIA_SPECIALTY_GROUPS.map(group => <section key={group.id} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: 9 }}>
-          <b style={{ display: 'block', marginBottom: 6, fontSize: 12 }}>{group.name}</b>
-          {group.skills.map((name, index) => {
-            const id = `${group.id}-${index}`;
-            const specialty = data.specialties.find(item => item.id === id) ?? { id, selected: false };
-            const target = magiaTarget(data, id);
-            return <div key={id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 52px', gap: 5, alignItems: 'center', minHeight: 30 }}>
-              <label style={{ display: 'flex', gap: 5, alignItems: 'center', minWidth: 0, fontSize: 11.5 }}>
-                <input type="checkbox" checked={specialty.selected} onChange={e => patch('specialties', data.specialties.map(item => item.id === id ? { ...item, selected: e.target.checked } : item))} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
-              </label>
-              <KInput aria-label={`${name} 목표치`} title={target ? `자동 계산 ${target}` : '혼의 특기를 선택하세요'} value={specialty.targetOverride ?? target} placeholder="-" onChange={e => patch('specialties', data.specialties.map(item => item.id === id ? { ...item, targetOverride: e.target.value || undefined } : item))} style={{ padding: '4px 5px', textAlign: 'center', fontSize: 11 }} />
-            </div>;
-          })}
-        </section>)}
+      <CocField label="혼의 특기" value={data.soulSpecialty} onChange={value => patch('soulSpecialty', value)} />
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+        {magiaDomains.map(domain => <label key={domain.id} style={{ display: 'flex', gap: 5, alignItems: 'center', fontSize: 12 }}>
+          <input
+            type="checkbox"
+            checked={data.specialties.some(specialty => specialty.id === domain.id && specialty.selected)}
+            onChange={event => patch('specialties', magiaDomains.map(item => ({
+              id: item.id,
+              selected: item.id === domain.id
+                ? event.target.checked
+                : data.specialties.find(specialty => specialty.id === item.id)?.selected ?? false,
+            })))}
+          />
+          {domain.name}
+        </label>)}
       </div>
     </details>
 
@@ -876,6 +923,7 @@ export function TCharForm({ editId }: { editId?: string }) {
   const orig = editId ? tchars.find(c => c.id === editId) : undefined;
 
   const [name, setName] = useState(orig?.name ?? '');
+  const [cocofoliaJson, setCocofoliaJson] = useState('');
   const [scenarioLogs, setScenarioLogs] = useState<TrpgScenarioLog[]>(() => scenarioLogsFor(orig));
   const [rule, setRule] = useState(orig?.rule ?? '');
   const [sheetType, setSheetType] = useState<NonNullable<TrpgChar['sheetType']>>(() => inferSheetType(orig));
@@ -895,6 +943,19 @@ export function TCharForm({ editId }: { editId?: string }) {
   const [viewFor, setViewFor] = useState<FaceDraft | null>(null);      // 썸네일 클릭 — 원본 전체 보기 (v1.9)
   const [sharedCropOpen, setSharedCropOpen] = useState(false);         // 스탠딩 — 공유 크롭
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const importCocofoliaCharacter = () => {
+    try {
+      const imported = parseCocofoliaMagiaCharacter(cocofoliaJson);
+      setName(imported.name);
+      setSheetType('magicalogia');
+      setRule(SHEET_RULE_LABELS.magicalogia);
+      setMagicalogia(current => ({ ...current, ...imported.sheet }));
+      toast('코코포리아 캐릭터 정보를 불러왔습니다. 가져오지 않은 항목은 직접 확인해 주세요.');
+    } catch (error) {
+      toast(`가져오지 못했습니다: ${error instanceof Error ? error.message : 'JSON 데이터를 확인해 주세요.'}`);
+    }
+  };
 
   // 수정 모드 — 저장본은 mount 후에 로드되므로, 로드가 끝나면 폼을 한 번 채움
   // (첫 렌더의 useState 초기값 시점엔 orig가 아직 시드뿐이라 직접 등록한 캐릭터는 비어 있던 버그 수정)
@@ -1031,6 +1092,21 @@ export function TCharForm({ editId }: { editId?: string }) {
         </div>)}
         <button className="btn btn-ghost" onClick={() => setScenarioLogs(rows => [...rows, { id: newId(), date: '', role: '', title: '', note: '' }])}>＋ 시나리오 기록</button>
       </details>
+
+      {sheetType === 'magicalogia' && <details className="panel" style={{ padding: 16 }}>
+        <summary className="k-label" style={{ cursor: 'pointer', marginBottom: 12 }}>코코포리아 캐릭터 데이터 가져오기</summary>
+        <p className="hint" style={{ margin: '0 0 8px' }}>코코포리아에서 복사한 캐릭터 JSON을 붙여넣으면 이름, 상태값, 마도서와 특기 목표치를 입력합니다.</p>
+        <textarea
+          aria-label="코코포리아 캐릭터 JSON"
+          value={cocofoliaJson}
+          onChange={event => setCocofoliaJson(event.target.value)}
+          placeholder='{"kind":"character","data":{...}}'
+          style={{ width: '100%', minHeight: 110, padding: 9, resize: 'vertical' }}
+        />
+        <button className="btn btn-ghost" style={{ marginTop: 8 }} disabled={!cocofoliaJson.trim()} onClick={importCocofoliaCharacter}>
+          JSON 적용
+        </button>
+      </details>}
 
       {sheetType === 'coc' && <CocSheetEditor data={coc} onChange={setCoc} />}
       {sheetType === 'insane' && <InsaneSheetEditor data={insane} onChange={setInsane} />}
