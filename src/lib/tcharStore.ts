@@ -415,6 +415,8 @@ export interface Dx3rdCharacterSheet {
   crawlingChaos?: { insanity: string; insanityDescription: string; root: string; grimoire: Dx3rdItem[]; spells: Dx3rdItem[] };
 }
 
+export type TrpgSheetType = 'general' | 'coc' | 'insane' | 'magicalogia' | 'dx3rd';
+
 export interface TrpgChar {
   id: string;
   name: string;              // 이름 (필수)
@@ -429,7 +431,7 @@ export interface TrpgChar {
   stdW?: number; stdH?: number; // 스탠딩 기준 크기 (업로드 검증용)
   faces: TrpgFace[];         // 첫 번째가 대표 인장
   ph: string;
-  sheetType?: 'general' | 'coc' | 'insane' | 'magicalogia' | 'dx3rd';
+  sheetType?: TrpgSheetType;
   coc?: CocInvestigatorSheet;
   insane?: InsaneCharacterSheet;
   magicalogia?: MagicaLogiaCharacterSheet;
