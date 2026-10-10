@@ -445,9 +445,9 @@ a{color:inherit;text-decoration:none}
 .tcd-page-actions .btn{min-height:30px;padding:5px 11px;font-size:10px}
 .tcd-layout{display:grid;grid-template-columns:82px minmax(330px,.92fr) minmax(380px,1.18fr);gap:18px;align-items:start;max-width:1480px;margin:0 auto}
 .tcd-nav{position:sticky;top:92px;display:grid;gap:4px;padding-top:18px}
-.tcd-nav a{display:flex;align-items:center;gap:7px;padding:9px 6px;border-left:2px solid transparent;color:var(--sub);font-size:calc(10.5px*var(--fs,1));text-decoration:none;transition:background .15s,color .15s,border-color .15s}
-.tcd-nav a span{font-size:9px;color:var(--faint);font-family:var(--serif)}
-.tcd-nav a:hover{color:var(--ink);background:var(--panel);border-left-color:var(--accent)}
+.tcd-nav button{appearance:none;display:flex;align-items:center;gap:7px;padding:9px 6px;border:0;border-left:2px solid transparent;background:transparent;color:var(--sub);font:inherit;font-size:calc(10.5px*var(--fs,1));text-align:left;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.tcd-nav button span{font-size:9px;color:var(--faint);font-family:var(--serif)}
+.tcd-nav button:hover,.tcd-nav button[aria-current=page]{color:var(--ink);background:var(--panel);border-left-color:var(--accent)}
 .tcd-content{display:grid;gap:13px;min-width:0}
 .tcd-content .tcd-sheet{max-width:none;margin:0;padding:20px}
 .tcd-overview{scroll-margin-top:24px;padding:24px}
@@ -484,8 +484,8 @@ a{color:inherit;text-decoration:none}
   .tcd-page-actions{flex-wrap:wrap;justify-content:flex-end}
   .tcd-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"visual" "nav" "content";gap:12px}
   .tcd-nav{grid-area:nav;position:sticky;top:60px;z-index:5;display:flex;overflow-x:auto;gap:4px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--panel-solid);box-shadow:var(--sh-sm)}
-  .tcd-nav a{flex:0 0 auto;border-left:0;border-bottom:2px solid transparent;padding:7px 9px;white-space:nowrap}
-  .tcd-nav a:hover{border-left-color:transparent;border-bottom-color:var(--accent)}
+  .tcd-nav button{flex:0 0 auto;border-left:0;border-bottom:2px solid transparent;padding:7px 9px;white-space:nowrap}
+  .tcd-nav button:hover,.tcd-nav button[aria-current=page]{border-left-color:transparent;border-bottom-color:var(--accent)}
   .tcd-content{grid-area:content}
   .tcd-visual{grid-area:visual;position:relative;top:auto}
   .tcd-art{height:min(68vh,680px);min-height:300px}

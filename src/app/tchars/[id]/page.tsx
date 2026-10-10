@@ -100,7 +100,13 @@ function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet
   </SheetSection>;
 }
 
-function CocSheetDetails({ character }: { character: CocInvestigatorSheet }) {
+function CocSheetDetails({ character, backstoryOnly = false }: { character: CocInvestigatorSheet; backstoryOnly?: boolean }) {
+  if (backstoryOnly) {
+    return <SheetSection id="sheet-backstory" title="백스토리">
+      <div className="post-body" style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(character.backstoryHtml ?? '') }} />
+    </SheetSection>;
+  }
+
   const stats = [
     ['근력', character.characteristics.str], ['민첩', character.characteristics.dex],
     ['정신', character.characteristics.pow], ['건강', character.characteristics.con],
@@ -120,10 +126,6 @@ function CocSheetDetails({ character }: { character: CocInvestigatorSheet }) {
     <DisplayFields fields={basic} />
     <h3 className="k-label" style={{ margin: '18px 0 10px' }}>능력치</h3>
     <DisplayFields fields={stats} />
-    {character.backstoryHtml && <div id="sheet-backstory" style={{ marginTop: 18, scrollMarginTop: 28 }}>
-      <h3 className="k-label">백스토리</h3>
-      <div className="post-body" style={{ marginTop: 8 }} dangerouslySetInnerHTML={{ __html: sanitizeHtml(character.backstoryHtml) }} />
-    </div>}
   </SheetSection>;
 }
 
@@ -228,6 +230,7 @@ export default function TCharDetailPage() {
   const [faceIdx, setFaceIdx] = useState(0);
   const [delAsk, setDelAsk] = useState(false);
   const [lbOpen, setLbOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('character-overview');
 
   const c = tchars.find(x => x.id === id);
   if (!loaded) return <section className="page" />;
@@ -250,6 +253,7 @@ export default function TCharDetailPage() {
     ...(sheetType === 'coc' && c.coc?.backstoryHtml ? [{ id: 'sheet-backstory', label: '백스토리' }] : []),
     ...(c.scenarioLogs?.length ? [{ id: 'scenario-history', label: '시나리오 기록' }] : []),
   ];
+  const selectedTab = detailNav.some(item => item.id === activeTab) ? activeTab : detailNav[0].id;
 
   return (
     <section className="page tcd-page">
@@ -266,14 +270,17 @@ export default function TCharDetailPage() {
       </div>
 
       <div className="tcd-layout">
-        <nav className="tcd-nav" aria-label="캐릭터 정보 목차">
-          {detailNav.map((item, index) => <a key={`${item.id}-${item.label}`} href={`#${item.id}`}>
+        <nav className="tcd-nav" aria-label="캐릭터 정보 탭">
+          {detailNav.map((item, index) => <button key={`${item.id}-${item.label}`}
+            type="button"
+            aria-current={selectedTab === item.id ? 'page' : undefined}
+            onClick={() => setActiveTab(item.id)}>
             <span>{String(index + 1).padStart(2, '0')}</span>{item.label}
-          </a>)}
+          </button>)}
         </nav>
 
         <div className="tcd-content">
-          <section id="character-overview" className="panel tcd-overview">
+          {selectedTab === 'character-overview' && <section id="character-overview" className="panel tcd-overview">
             <div className="tcd-kicker">BASIC INFORMATION</div>
             {sheetType !== 'magicalogia' && <h2>{c.name}</h2>}
             {c.role && <span className="pill dark">{c.role}</span>}
@@ -282,13 +289,14 @@ export default function TCharDetailPage() {
             {c.desc
               ? <div className="post-body tcd-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(c.desc) }} />
               : sheetType !== 'magicalogia' && <p className="hint tcd-description">설명이 없습니다</p>}
-          </section>
+          </section>}
 
-          {sheetType === 'coc' && c.coc && <CocSheetDetails character={c.coc} />}
-          {sheetType === 'insane' && c.insane && <InsaneSheetDetails character={c.insane} />}
-          {sheetType === 'magicalogia' && c.magicalogia && <MagiaSheetDetails character={c.magicalogia} />}
-          {sheetType === 'dx3rd' && c.dx3rd && <Dx3rdSheetDetails character={c.dx3rd} />}
-          {c.scenarioLogs && c.scenarioLogs.length > 0 && <SheetSection id="scenario-history" title="시나리오 기록">
+          {selectedTab === 'sheet-profile' && sheetType === 'coc' && c.coc && <CocSheetDetails character={c.coc} />}
+          {selectedTab === 'sheet-profile' && sheetType === 'insane' && c.insane && <InsaneSheetDetails character={c.insane} />}
+          {selectedTab === 'sheet-profile' && sheetType === 'magicalogia' && c.magicalogia && <MagiaSheetDetails character={c.magicalogia} />}
+          {selectedTab === 'sheet-profile' && sheetType === 'dx3rd' && c.dx3rd && <Dx3rdSheetDetails character={c.dx3rd} />}
+          {selectedTab === 'sheet-backstory' && sheetType === 'coc' && c.coc && <CocSheetDetails character={c.coc} backstoryOnly />}
+          {selectedTab === 'scenario-history' && c.scenarioLogs && c.scenarioLogs.length > 0 && <SheetSection id="scenario-history" title="시나리오 기록">
             <div className="tcd-scenarios">
               {c.scenarioLogs.map(log => <p key={log.id}>
                 {[log.title, log.date, log.role, log.note].filter(Boolean).join(' · ')}
