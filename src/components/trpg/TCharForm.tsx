@@ -835,7 +835,7 @@ const SHEET_RULE_LABELS = {
   general: '기타 / 자유 입력', coc: 'CoC 7판', insane: 'inSANe', magicalogia: '마기카로기아', dx3rd: 'DX3rd',
 } as const;
 
-function inferSheetType(character?: TrpgChar): TrpgChar['sheetType'] {
+function inferSheetType(character?: TrpgChar): NonNullable<TrpgChar['sheetType']> {
   if (character?.sheetType) return character.sheetType;
   const rule = (character?.rule ?? '').toLowerCase();
   if (rule.includes('insane') || rule.includes('인세인')) return 'insane';
@@ -973,9 +973,9 @@ export function TCharForm({ editId }: { editId?: string }) {
       name: name.trim(), scenario: scenarioLogs[scenarioLogs.length - 1]?.title ?? '', scenarioLogs,
       rule: sheetType === 'general' ? rule.trim() : SHEET_RULE_LABELS[sheetType], role: role.trim(),
       sheetType,
-      coc: sheetType === 'coc' || orig?.coc ? { ...coc, scenarioLogs: undefined } : undefined,
+      coc: sheetType === 'coc' || orig?.coc ? { ...coc, scenarioLogs: [] } : undefined,
       insane: sheetType === 'insane' || orig?.insane ? insane : undefined,
-      magicalogia: sheetType === 'magicalogia' || orig?.magicalogia ? { ...magicalogia, sessionLogs: undefined } : undefined,
+      magicalogia: sheetType === 'magicalogia' || orig?.magicalogia ? { ...magicalogia, sessionLogs: [] } : undefined,
       dx3rd: sheetType === 'dx3rd' || orig?.dx3rd ? dx3rd : undefined,
       desc, faces: outFaces, imgMode,
       crop: imgMode === 'standing' ? sharedCrop : undefined,
