@@ -11,6 +11,93 @@ export interface TrpgFace {
   ph?: string;               // 데모 플레이스홀더
 }
 
+export interface CocSkill {
+  id: string;
+  name: string;
+  base: string;
+  current: string;
+  growthChecked: boolean;
+}
+
+export interface CocWeapon {
+  id: string;
+  name: string;
+  skill: string;
+  damage: string;
+  range: string;
+  attacks: string;
+  ammo: string;
+  malfunction: string;
+  image: string;
+}
+
+export interface CocInventoryItem {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface CocScenarioLog {
+  id: string;
+  title: string;
+  date: string;
+  note: string;
+}
+
+export interface CocInvestigatorSheet {
+  investigator: {
+    player: string;
+    occupation: string;
+    age: string;
+    gender: string;
+    residence: string;
+    birthplace: string;
+    catchphrase: string;
+  };
+  characteristics: Record<'str' | 'con' | 'siz' | 'dex' | 'app' | 'int' | 'pow' | 'edu', string>;
+  derived: {
+    hp: string;
+    hpMax: string;
+    mp: string;
+    mpMax: string;
+    sanity: string;
+    sanityMax: string;
+    luck: string;
+    damageBonus: string;
+    build: string;
+    moveRate: string;
+  };
+  mental: {
+    sanityAdaptation: string;
+    temporaryInsanity: boolean;
+    longTermInsanity: boolean;
+    bout: string;
+    currentState: string;
+  };
+  skills: CocSkill[];
+  backstoryHtml: string;
+  weapons: CocWeapon[];
+  equipment: CocInventoryItem[];
+  possessions: CocInventoryItem[];
+  finance: { spendingLevel: string; cash: string; assets: string };
+  scenarioLogs: CocScenarioLog[];
+}
+
+export const COC7_SKILL_DEFAULTS = [
+  ['회계', '5'], ['인류학', '1'], ['감정', '5'], ['고고학', '1'],
+  ['예술/공예(전문화)', '5'], ['매혹', '15'], ['등반', '20'], ['신용', '0'],
+  ['크툴루 신화', '0'], ['변장', '5'], ['회피', 'DEX/2'], ['자동차 운전', '20'],
+  ['전기수리', '10'], ['전자기기', '1'], ['컴퓨터 사용', '5'], ['말재주', '5'], ['근접전(격투)', '25'],
+  ['사격(권총)', '20'], ['사격(소총/산탄총)', '25'], ['응급처치', '30'], ['역사', '5'],
+  ['위협', '15'], ['도약', '20'], ['외국어(모국어)', 'EDU'], ['외국어(전문화)', '1'],
+  ['법률', '5'], ['자료조사', '20'], ['듣기', '20'], ['열쇠공', '1'],
+  ['기계수리', '10'], ['의료', '1'], ['자연', '10'], ['항법', '10'],
+  ['오컬트', '5'], ['설득', '10'], ['조종(전문화)', '1'], ['정신분석', '1'],
+  ['심리학', '10'], ['승마', '5'], ['과학(전문화)', '1'], ['손놀림', '10'],
+  ['관찰력', '25'], ['은밀행동', '20'], ['생존술(전문화)', '10'], ['수영', '20'],
+  ['투척', '20'], ['추적', '10'],
+] as const;
+
 export interface TrpgChar {
   id: string;
   name: string;              // 이름 (필수)
@@ -25,6 +112,8 @@ export interface TrpgChar {
   stdW?: number; stdH?: number; // 스탠딩 기준 크기 (업로드 검증용)
   faces: TrpgFace[];         // 첫 번째가 대표 인장
   ph: string;
+  sheetType?: 'general' | 'coc';
+  coc?: CocInvestigatorSheet;
 }
 
 /** 표정의 썸네일 크롭 — 스탠딩이면 공유 크롭, 단일 인장이면 개별 크롭 */
