@@ -19,10 +19,14 @@ import { useBlobUrl } from '@/lib/blobStore';
 
 type DisplayField = readonly [label: string, value: string | number | boolean | undefined | null];
 
-function DisplayFields({ fields }: { fields: readonly DisplayField[] }) {
+function DisplayFields({ fields, columns }: { fields: readonly DisplayField[]; columns?: 2 | 3 }) {
   const visibleFields = fields.filter(([, value]) => value !== undefined && value !== null && value !== '');
   if (visibleFields.length === 0) return null;
-  return <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', gap: 12 }}>
+  return <dl className={columns ? `tcd-fields-${columns}` : undefined} style={{
+    display: 'grid',
+    gridTemplateColumns: columns ? `repeat(${columns}, minmax(0, 1fr))` : 'repeat(auto-fit, minmax(135px, 1fr))',
+    gap: 12,
+  }}>
     {visibleFields.map(([label, value]) => <div key={label}>
       <dt className="k-label">{label}</dt>
       <dd style={{ margin: '3px 0 0', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{String(value)}</dd>
@@ -37,6 +41,33 @@ function SheetSection({ id, title, children }: { id: string; title: string; chil
   </section>;
 }
 
+function MagiaBasicDetails({ name, character }: { name: string; character: MagicaLogiaCharacterSheet }) {
+  const identity = [
+    ['이름', name],
+    ['계제', character.rank],
+  ] as const;
+  const stats = [
+    ['공격력', character.attack],
+    ['방어력', character.defense],
+    ['근원력', character.root],
+  ] as const;
+  const background = [
+    ['경력', character.career],
+    ['기관', character.institution],
+    ['사회적 신분', character.socialStatus],
+    ['나이', character.age],
+    ['성별', character.gender],
+  ] as const;
+  const trueForm = [['진정한 모습', [character.trueForm, character.trueFormEffect].filter(Boolean).join('\n')]] as const;
+
+  return <>
+    <div style={{ marginTop: 18 }}><DisplayFields fields={identity} columns={2} /></div>
+    <div style={{ marginTop: 16 }}><DisplayFields fields={stats} columns={3} /></div>
+    <div style={{ marginTop: 16 }}><DisplayFields fields={background} columns={3} /></div>
+    <div style={{ marginTop: 16 }}><DisplayFields fields={trueForm} /></div>
+  </>;
+}
+
 function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet }) {
   const domains = MAGICALOGIA_SPECIALTY_GROUPS
     .filter(domain => character.specialties?.some(specialty => specialty.selected
@@ -45,28 +76,10 @@ function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet
   const [legacyDomainId, legacyIndex] = (character.soulSpecialtyId ?? '').split('-');
   const legacySoul = MAGICALOGIA_SPECIALTY_GROUPS.find(domain => domain.id === legacyDomainId)?.skills[Number(legacyIndex)] ?? '';
   const spells = character.spells ?? [];
-  const stats = [
-    ['공격력', character.attack],
-    ['방어력', character.defense],
-    ['근원력', character.root],
-  ] as const;
-  const profile = [
-    ['계제', character.rank],
-    ['경력 · 기관', [character.career, character.institution].filter(Boolean).join(' · ')],
-    ['영역', domains.join(' · ')],
-    ['혼의 특기', character.soulSpecialty || legacySoul],
-    ['사회적 신분', character.socialStatus],
-    ['나이', character.age],
-    ['성별', character.gender],
-    ['진정한 모습', [character.trueForm, character.trueFormEffect].filter(Boolean).join('\n')],
-  ] as DisplayField[];
 
-  return <>
-    <SheetSection id="sheet-profile" title="마기카로기아">
-      <DisplayFields fields={stats} />
-      <div style={{ marginTop: 14 }}><DisplayFields fields={profile} /></div>
-    </SheetSection>
-    {(spells.length > 0 || character.grimoireSettings) && <SheetSection id="sheet-grimoire" title="마도서">
+  return <SheetSection id="sheet-profile" title="프로필">
+    {(spells.length > 0 || character.grimoireSettings) && <div id="sheet-grimoire" style={{ scrollMarginTop: 28 }}>
+      <h3 className="k-label">장서</h3>
       {character.grimoireSettings && <p style={{ marginTop: 6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{character.grimoireSettings}</p>}
       {spells.length > 0 && <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
         {spells.map(spell => <article key={spell.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 10 }}>
@@ -77,8 +90,14 @@ function MagiaSheetDetails({ character }: { character: MagicaLogiaCharacterSheet
           {spell.memo && <p className="hint" style={{ margin: '5px 0 0', whiteSpace: 'pre-wrap' }}>{spell.memo}</p>}
         </article>)}
       </div>}
-    </SheetSection>}
-  </>;
+    </div>}
+    {character.soulSpecialty || legacySoul ? <div style={{ marginTop: 16 }}>
+      <DisplayFields fields={[['혼의 특기', character.soulSpecialty || legacySoul]]} />
+    </div> : null}
+    {domains.length > 0 && <div style={{ marginTop: 16 }}>
+      <DisplayFields fields={[['영역', domains.join(' · ')]]} />
+    </div>}
+  </SheetSection>;
 }
 
 function CocSheetDetails({ character }: { character: CocInvestigatorSheet }) {
@@ -222,16 +241,14 @@ export default function TCharDetailPage() {
 
   const face = c.faces[Math.min(faceIdx, c.faces.length - 1)] ?? c.faces[0];
   const sheetType = activeSheetType(c);
-  const magiaHasGrimoire = sheetType === 'magicalogia'
-    && Boolean(c.magicalogia?.grimoireSettings || c.magicalogia?.spells?.length);
   const detailNav = [
     { id: 'character-overview', label: '기본 정보' },
     ...(sheetType === 'coc' && c.coc ? [{ id: 'sheet-profile', label: 'CoC' }] : []),
     ...(sheetType === 'insane' && c.insane ? [{ id: 'sheet-profile', label: 'inSANe' }] : []),
-    ...(sheetType === 'magicalogia' && c.magicalogia ? [{ id: 'sheet-profile', label: '마기카로기아' }] : []),
-    ...(magiaHasGrimoire ? [{ id: 'sheet-grimoire', label: '마도서' }] : []),
+    ...(sheetType === 'magicalogia' && c.magicalogia ? [{ id: 'sheet-profile', label: '프로필' }] : []),
     ...(sheetType === 'dx3rd' && c.dx3rd ? [{ id: 'sheet-profile', label: 'DX3rd' }] : []),
     ...(sheetType === 'coc' && c.coc?.backstoryHtml ? [{ id: 'sheet-backstory', label: '백스토리' }] : []),
+    ...(c.scenarioLogs?.length ? [{ id: 'scenario-history', label: '시나리오 기록' }] : []),
   ];
 
   return (
@@ -257,28 +274,27 @@ export default function TCharDetailPage() {
 
         <div className="tcd-content">
           <section id="character-overview" className="panel tcd-overview">
-            <div className="tcd-kicker">PROFILE <span>??</span></div>
-            <h2>{c.name}</h2>
+            <div className="tcd-kicker">BASIC INFORMATION</div>
+            {sheetType !== 'magicalogia' && <h2>{c.name}</h2>}
             {c.role && <span className="pill dark">{c.role}</span>}
-            <div className="tcd-meta">
-              {c.rule && <span><b>Rule</b>{c.rule}</span>}
-              {c.scenario && <span><b>Scenario</b>{c.scenario}</span>}
-            </div>
+            {c.rule && <div className="tcd-meta"><span><b>Rule</b>{c.rule}</span></div>}
+            {sheetType === 'magicalogia' && c.magicalogia && <MagiaBasicDetails name={c.name} character={c.magicalogia} />}
             {c.desc
               ? <div className="post-body tcd-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(c.desc) }} />
-              : <p className="hint tcd-description">설명이 없습니다</p>}
-            {c.scenarioLogs && c.scenarioLogs.length > 0 && <div className="tcd-scenarios">
-              <h3 className="k-label">시나리오 기록</h3>
-              {c.scenarioLogs.map(log => <p key={log.id}>
-                {[log.title, log.date, log.role, log.note].filter(Boolean).join(' · ')}
-              </p>)}
-            </div>}
+              : sheetType !== 'magicalogia' && <p className="hint tcd-description">설명이 없습니다</p>}
           </section>
 
           {sheetType === 'coc' && c.coc && <CocSheetDetails character={c.coc} />}
           {sheetType === 'insane' && c.insane && <InsaneSheetDetails character={c.insane} />}
           {sheetType === 'magicalogia' && c.magicalogia && <MagiaSheetDetails character={c.magicalogia} />}
           {sheetType === 'dx3rd' && c.dx3rd && <Dx3rdSheetDetails character={c.dx3rd} />}
+          {c.scenarioLogs && c.scenarioLogs.length > 0 && <SheetSection id="scenario-history" title="시나리오 기록">
+            <div className="tcd-scenarios">
+              {c.scenarioLogs.map(log => <p key={log.id}>
+                {[log.title, log.date, log.role, log.note].filter(Boolean).join(' · ')}
+              </p>)}
+            </div>
+          </SheetSection>}
         </div>
 
         <div className="tcd-visual">

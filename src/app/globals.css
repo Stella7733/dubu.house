@@ -490,6 +490,7 @@ a{color:inherit;text-decoration:none}
   .tcd-visual{grid-area:visual;position:relative;top:auto}
   .tcd-art{height:min(68vh,680px);min-height:300px}
   .tcd-content .tcd-sheet,.tcd-overview{padding:17px}
+  .tcd-content .tcd-fields-3{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
 .tc-card .bd{padding:9px 13px 13px}
 /* 이름이 길면 말줄임 — 뱃지는 유지 (v1.9) */
